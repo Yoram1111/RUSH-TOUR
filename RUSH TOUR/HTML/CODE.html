@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>RUSH HOUR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet"/>
+    <style>
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        html,body{height:100%;background:#05091a;color:#b8d0ee;font-family:'Rajdhani',sans-serif;user-select:none;-webkit-user-select:none;overflow-x:hidden}
+
+        /* Fond grille animée */
+        body::before{
+            content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+            background-image:linear-gradient(rgba(10,173,255,.04)1px,transparent 1px),linear-gradient(90deg,rgba(10,173,255,.04)1px,transparent 1px);
+            background-size:44px 44px;animation:gs 18s linear infinite;
+        }
+        @keyframes gs{to{background-position:44px 44px}}
+
+        .wrap{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh;padding:0 20px 30px}
+
+        /* ── HEADER ── */
+        header{display:flex;justify-content:space-between;align-items:center;padding:16px 0 12px;border-bottom:1px solid rgba(60,140,255,.18);flex-wrap:wrap;gap:12px}
+        .logo{display:flex;align-items:baseline;gap:8px}
+        .lr{font-family:'Orbitron',sans-serif;font-size:clamp(18px,4vw,32px);font-weight:900;color:#ff2550;text-shadow:0 0 14px rgba(255,37,80,.9),0 0 40px rgba(255,37,80,.4);letter-spacing:4px}
+        .lh{font-family:'Orbitron',sans-serif;font-size:clamp(18px,4vw,32px);font-weight:900;color:#0aadff;text-shadow:0 0 14px rgba(10,173,255,.9),0 0 40px rgba(10,173,255,.4);letter-spacing:4px}
+        .ls{font-size:10px;letter-spacing:3px;color:rgba(180,220,255,.35);align-self:flex-end}
+        .stats{display:flex;gap:10px;flex-wrap:wrap}
+        .stat{background:rgba(8,18,40,.8);border:1px solid rgba(60,140,255,.18);border-radius:30px;padding:5px 16px;display:flex;flex-direction:column;align-items:center;backdrop-filter:blur(10px);min-width:64px}
+        .sl{font-size:9px;letter-spacing:2px;color:rgba(180,220,255,.4);font-family:'Orbitron',sans-serif}
+        .sv{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:700;color:#00ffe1;text-shadow:0 0 10px rgba(0,255,225,.6);line-height:1.1}
+
+        /* ── LAYOUT ── */
+        main{display:grid;grid-template-columns:185px 1fr 185px;gap:22px;flex:1;align-items:start;padding:22px 0}
+        .panel{background:rgba(8,18,40,.8);border:1px solid rgba(60,140,255,.18);border-radius:14px;padding:16px;backdrop-filter:blur(12px);display:flex;flex-direction:column;gap:14px}
+        .ptitle{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:#0aadff;text-shadow:0 0 8px rgba(10,173,255,.5);margin-bottom:8px}
+        .pcard{background:rgba(0,0,0,.22);border:1px solid rgba(60,130,230,.1);border-radius:9px;padding:12px}
+        .pcard p{font-size:12.5px;color:rgba(200,230,255,.65);line-height:1.6;margin-bottom:4px}
+        .lr-row{display:flex;align-items:center;gap:9px;margin-bottom:7px;font-size:12px;color:rgba(200,230,255,.6)}
+        .sw{width:26px;height:15px;border-radius:5px;flex-shrink:0}
+
+        /* ── LISTE NIVEAUX ── */
+        .lvl-btn{background:rgba(0,0,0,.25);border:1px solid rgba(60,140,255,.14);border-radius:7px;padding:9px 12px;cursor:pointer;color:rgba(200,230,255,.65);font-family:'Rajdhani',sans-serif;font-size:13px;text-align:left;width:100%;display:flex;justify-content:space-between;align-items:center;transition:all .2s;margin-bottom:6px}
+        .lvl-btn:hover{background:rgba(10,173,255,.1);border-color:#0aadff;color:#fff;transform:translateX(3px)}
+        .lvl-btn.active{background:rgba(10,173,255,.15);border-color:#0aadff;color:#00ffe1}
+        .lvl-btn.done{border-color:#1dff8a;color:#1dff8a}
+        .lbadge{font-size:10px;letter-spacing:1px;opacity:.6}
+        .lvl-btn.done .lbadge{opacity:1}
+        #tip-card{display:none}
+        #tip-text{font-size:13px;color:rgba(255,230,0,.85);line-height:1.6}
+
+        /* ── ZONE CENTRALE ── */
+        .bwrap{display:flex;flex-direction:column;align-items:center;gap:18px}
+        .exit-tag{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:4px;color:#ff2550;text-shadow:0 0 14px rgba(255,37,80,.9);align-self:flex-end;margin-right:6px;animation:blink 2s ease-in-out infinite}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+
+        /* ── GRILLE ──
+           La grille a position:relative.
+           Les cellules de fond sont des divs inline-block (ou grid).
+           Les voitures sont en position:absolute par-dessus.
+           On calcule leur left/top/width/height en JS depuis la taille réelle des cellules.
+        */
+        #board-outer{position:relative}
+        #board{
+            display:grid;
+            grid-template-columns:repeat(6,var(--cs,68px));
+            grid-template-rows:repeat(6,var(--cs,68px));
+            gap:5px;
+            padding:10px;
+            background:rgba(3,9,22,.92);
+            border:1px solid rgba(60,140,255,.18);
+            border-radius:16px;
+            box-shadow:0 0 60px rgba(10,173,255,.2),0 0 120px rgba(10,173,255,.08),inset 0 0 50px rgba(0,0,0,.7);
+            position:relative; /* Les voitures sont absolues par-dessus */
+            touch-action:none;
+        }
+        /* Indicateur de sortie côté droit rangée 2 (index 2, 0-based) */
+        #board::after{
+            content:'';position:absolute;
+            right:-13px;
+            top:calc(10px + 2*(var(--cs,68px) + 5px));
+            width:13px;height:var(--cs,68px);
+            background:linear-gradient(to right,rgba(255,37,80,.05),rgba(255,37,80,.35));
+            border-radius:0 6px 6px 0;
+            box-shadow:5px 0 20px rgba(255,37,80,.45);
+        }
+        /* Cellule de fond */
+        .cell{background:rgba(10,173,255,.028);border:1px solid rgba(60,130,230,.065);border-radius:6px}
+
+        /* ── VOITURES ── position:absolute dans #board */
+        .car{
+            position:absolute;
+            border-radius:11px;
+            cursor:grab;
+            display:flex;align-items:center;justify-content:center;
+            overflow:hidden;
+            touch-action:none;
+            z-index:10;
+            /* transition sur left/top pour l'animation de glissement */
+            transition:left .15s cubic-bezier(.22,1,.36,1),top .15s cubic-bezier(.22,1,.36,1),box-shadow .2s,filter .18s,transform .18s;
+        }
+        .car::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:1;background:linear-gradient(140deg,rgba(255,255,255,.28) 0%,rgba(255,255,255,.04) 45%,transparent 56%)}
+        .car::after{content:'';position:absolute;border-radius:3px;z-index:2;background:rgba(255,255,255,.13)}
+        .car.H::after{width:100%;height:3px;top:50%;transform:translateY(-50%)}
+        .car.V::after{height:100%;width:3px;left:50%;transform:translateX(-50%)}
+        .car-lbl{font-size:14px;z-index:3;pointer-events:none}
+        .car:hover{filter:brightness(1.2)}
+        .car.dragging{cursor:grabbing;filter:brightness(1.4) saturate(1.2);transform:scale(1.05);z-index:30;transition:none}/* pas de transition pendant le drag */
+        .car.moving{filter:brightness(1.3)}
+        .car.shake{animation:shake .32s ease}
+        @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+        .car.target{animation:pulse 2.5s ease-in-out infinite}
+        @keyframes pulse{0%,100%{box-shadow:0 0 14px rgba(255,37,80,.9),0 0 40px rgba(255,37,80,.4)}50%{box-shadow:0 0 28px rgba(255,37,80,1),0 0 60px rgba(255,37,80,.6)}}
+        /* Couleurs */
+        .car[data-c=red]   {background:linear-gradient(135deg,#ff3060,#cc0030)}
+        .car[data-c=blue]  {background:linear-gradient(135deg,#007aff,#0040cc);box-shadow:0 0 14px rgba(0,122,255,.8),0 0 40px rgba(0,122,255,.3)}
+        .car[data-c=teal]  {background:linear-gradient(135deg,#00c7be,#008884);box-shadow:0 0 14px rgba(0,199,190,.8),0 0 40px rgba(0,199,190,.3)}
+        .car[data-c=green] {background:linear-gradient(135deg,#30d158,#1a8a35);box-shadow:0 0 14px rgba(48,209,88,.8),0 0 40px rgba(48,209,88,.3)}
+        .car[data-c=purple]{background:linear-gradient(135deg,#bf5fff,#7a20cc);box-shadow:0 0 14px rgba(191,95,255,.8),0 0 40px rgba(191,95,255,.3)}
+        .car[data-c=orange]{background:linear-gradient(135deg,#ff9f0a,#cc6600);box-shadow:0 0 14px rgba(255,159,10,.8),0 0 40px rgba(255,159,10,.3)}
+        .car[data-c=pink]  {background:linear-gradient(135deg,#ff4ec4,#cc1a8a);box-shadow:0 0 14px rgba(255,78,196,.8),0 0 40px rgba(255,78,196,.3)}
+        .car[data-c=yellow]{background:linear-gradient(135deg,#ffd60a,#aa8800);box-shadow:0 0 14px rgba(255,214,10,.8),0 0 40px rgba(255,214,10,.3)}
+        .car[data-c=lime]  {background:linear-gradient(135deg,#a2e635,#5c9a00);box-shadow:0 0 14px rgba(162,230,53,.8),0 0 40px rgba(162,230,53,.3)}
+        .car[data-c=indigo]{background:linear-gradient(135deg,#5e5ce6,#2a28aa);box-shadow:0 0 14px rgba(94,92,230,.8),0 0 40px rgba(94,92,230,.3)}
+
+        /* ── BOUTONS ── */
+        .actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+        .btn{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:2px;padding:9px 20px;border:1px solid rgba(60,140,255,.18);border-radius:30px;background:rgba(8,18,40,.8);color:rgba(200,230,255,.8);cursor:pointer;display:flex;align-items:center;gap:7px;transition:all .2s;backdrop-filter:blur(8px)}
+        .btn:hover{transform:translateY(-2px);color:#fff}
+        .btn-reset:hover{border-color:#ff9f0a;box-shadow:0 0 14px rgba(255,159,10,.3);background:rgba(255,159,10,.1)}
+        .btn-hint:hover{border-color:#ffd60a;box-shadow:0 0 14px rgba(255,214,10,.3);background:rgba(255,214,10,.08)}
+        .btn-skip:hover{border-color:#0aadff;box-shadow:0 0 14px rgba(10,173,255,.3);background:rgba(10,173,255,.1)}
+        .btn:active{transform:scale(.97)}
+
+        /* ── VICTOIRE ── */
+        #win{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.72);backdrop-filter:blur(14px)}
+        #win.show{display:flex;animation:fi .35s ease}
+        @keyframes fi{from{opacity:0}to{opacity:1}}
+        #confetti{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
+        .wbox{position:relative;z-index:1;background:rgba(3,9,22,.94);border:1px solid rgba(0,255,225,.3);border-radius:22px;padding:46px 54px;text-align:center;max-width:92vw;box-shadow:0 0 60px rgba(0,255,225,.18);animation:pi .45s cubic-bezier(.34,1.56,.64,1)}
+        @keyframes pi{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+        .wicon{font-size:56px;margin-bottom:14px}
+        .wtitle{font-family:'Orbitron',sans-serif;font-size:clamp(20px,5vw,36px);font-weight:900;letter-spacing:6px;color:#00ffe1;text-shadow:0 0 20px rgba(0,255,225,.8);margin-bottom:10px}
+        .wsub{font-size:15px;color:rgba(200,230,255,.55);margin-bottom:4px}
+        .wmv{font-family:'Orbitron',sans-serif;font-size:13px;color:#ffd60a;text-shadow:0 0 10px rgba(255,214,10,.5);margin-bottom:18px;letter-spacing:2px}
+        .wstars{font-size:30px;margin-bottom:26px;letter-spacing:6px}
+        .wbtn{font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:3px;padding:13px 38px;background:linear-gradient(135deg,rgba(0,255,225,.18),rgba(10,173,255,.18));border:1px solid #00ffe1;border-radius:40px;color:#00ffe1;cursor:pointer;box-shadow:0 0 20px rgba(0,255,225,.2);transition:all .22s}
+        .wbtn:hover{box-shadow:0 0 30px rgba(0,255,225,.4);transform:translateY(-2px) scale(1.03)}
+
+        /* ── RESPONSIVE ── */
+        @media(max-width:900px){
+            main{grid-template-columns:1fr;grid-template-rows:auto auto auto}
+            .panel-left{order:2;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+            .bwrap{order:1}
+            .panel-right{order:3}
+            .mcard{grid-column:span 2}
+        }
+        @media(max-width:540px){
+            .panel-left{grid-template-columns:1fr}
+            .mcard{grid-column:span 1}
+            .wbox{padding:30px 20px}
+        }
+    </style>
+</head>
+<body>
+
+<!-- Victoire -->
+<div id="win">
+    <canvas id="confetti"></canvas>
+    <div class="wbox">
+        <div class="wicon">🚀</div>
+        <h2 class="wtitle">ÉVASION RÉUSSIE</h2>
+        <p class="wsub">Niveau <span id="w-lvl">1</span> complété</p>
+        <p class="wmv">en <span id="w-mv">0</span> mouvements</p>
+        <div class="wstars" id="w-stars"></div>
+        <button class="wbtn" id="btn-next">NIVEAU SUIVANT →</button>
+    </div>
+</div>
+
+<div class="wrap">
+    <header>
+        <div class="logo">
+            <span class="lr">RUSH</span>
+            <span class="lh">HOUR</span>
+            <span class="ls">ESCAPE PROTOCOL</span>
+        </div>
+        <div class="stats">
+            <div class="stat"><span class="sl">NIVEAU</span><span class="sv" id="h-lvl">01</span></div>
+            <div class="stat"><span class="sl">MOUVEMENTS</span><span class="sv" id="h-mv">00</span></div>
+            <div class="stat"><span class="sl">RECORD</span><span class="sv" id="h-best">--</span></div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Panel gauche -->
+        <aside class="panel panel-left">
+            <div class="pcard mcard">
+                <div class="ptitle">MISSION</div>
+                <p id="mission">Guidez ★ vers la sortie →</p>
+            </div>
+            <div class="pcard">
+                <div class="ptitle">LÉGENDE</div>
+                <div class="lr-row"><div class="sw" style="background:#ff2550;box-shadow:0 0 8px rgba(255,37,80,.7)"></div>Voiture cible ★</div>
+                <div class="lr-row"><div class="sw" style="background:#007aff;box-shadow:0 0 8px rgba(0,122,255,.7)"></div>Horizontal</div>
+                <div class="lr-row"><div class="sw" style="background:#30d158;box-shadow:0 0 8px rgba(48,209,88,.7)"></div>Vertical</div>
+                <div class="lr-row"><div class="sw" style="background:#ff9f0a;box-shadow:0 0 8px rgba(255,159,10,.7);width:40px"></div>Camion ×3</div>
+            </div>
+            <div class="pcard">
+                <div class="ptitle">CONTRÔLES</div>
+                <p>🖱 Glisser-déposer</p>
+                <p>⌨️ Flèches + Tab</p>
+                <p>👆 Tactile</p>
+            </div>
+        </aside>
+
+        <!-- Centre -->
+        <div class="bwrap">
+            <div class="exit-tag">SORTIE →</div>
+            <div id="board-outer">
+                <div id="board"></div>
+            </div>
+            <div class="actions">
+                <button class="btn btn-reset" id="btn-reset">↺ RESET</button>
+                <button class="btn btn-hint"  id="btn-hint">💡 INDICE</button>
+                <button class="btn btn-skip"  id="btn-skip">⏩ SUIVANT</button>
+            </div>
+        </div>
+
+        <!-- Panel droit -->
+        <aside class="panel panel-right">
+            <div class="ptitle">NIVEAUX</div>
+            <div id="lvl-list"></div>
+            <div class="pcard" id="tip-card">
+                <div class="ptitle">💡 INDICE</div>
+                <p id="tip-text"></p>
+            </div>
+        </aside>
+    </main>
+</div>
+
+<script>
+    /* ════════════════════════════════════════════
+       NIVEAUX
+       row/col : 0-indexed (0..5)
+       dir H = horizontal, dir V = vertical
+       Victoire : red.col + red.len - 1 >= 5
+    ════════════════════════════════════════════ */
+    const LEVELS = [
+        {
+            name:'Initiation', diff:'EASY',
+            hint:'Déplacez le camion orange vers le haut, puis la voiture rose vers la gauche.',
+            cars:[
+                {id:'red',row:2,col:0,len:2,dir:'H',color:'red'},
+                {id:'a1', row:0,col:2,len:2,dir:'V',color:'blue'},
+                {id:'a2', row:0,col:4,len:3,dir:'V',color:'orange'},
+                {id:'a3', row:1,col:3,len:2,dir:'H',color:'teal'},
+                {id:'a4', row:3,col:1,len:2,dir:'H',color:'green'},
+                {id:'a5', row:4,col:3,len:2,dir:'V',color:'purple'},
+                {id:'a6', row:2,col:4,len:2,dir:'H',color:'pink'},
+            ]
+        },
+        {
+            name:'Embouteillage', diff:'MEDIUM',
+            hint:'Les blocs verticaux colonnes 2 et 3 bloquent la rangée 2. Déplacez-les vers le bas.',
+            cars:[
+                {id:'red',row:2,col:0,len:2,dir:'H',color:'red'},
+                {id:'b1', row:0,col:2,len:3,dir:'V',color:'indigo'},
+                {id:'b2', row:0,col:3,len:2,dir:'V',color:'blue'},
+                {id:'b3', row:3,col:3,len:2,dir:'H',color:'teal'},
+                {id:'b4', row:0,col:5,len:2,dir:'V',color:'lime'},
+                {id:'b5', row:3,col:5,len:2,dir:'V',color:'orange'},
+                {id:'b6', row:3,col:1,len:2,dir:'H',color:'green'},
+                {id:'b7', row:4,col:4,len:2,dir:'H',color:'purple'},
+                {id:'b8', row:1,col:0,len:2,dir:'H',color:'yellow'},
+                {id:'b9', row:4,col:0,len:2,dir:'V',color:'pink'},
+            ]
+        },
+        {
+            name:'Labyrinthe', diff:'HARD',
+            hint:'Montez les blocs verticaux col.0 et col.1, puis libérez la rangée 2 en chaîne.',
+            cars:[
+                {id:'red',row:2,col:0,len:2,dir:'H',color:'red'},
+                {id:'c1', row:0,col:0,len:2,dir:'V',color:'blue'},
+                {id:'c2', row:0,col:1,len:2,dir:'V',color:'orange'},
+                {id:'c3', row:0,col:3,len:2,dir:'H',color:'teal'},
+                {id:'c4', row:1,col:2,len:2,dir:'V',color:'purple'},
+                {id:'c5', row:0,col:4,len:2,dir:'V',color:'lime'},
+                {id:'c6', row:3,col:2,len:3,dir:'H',color:'yellow'},
+                {id:'c7', row:2,col:5,len:3,dir:'V',color:'indigo'},
+                {id:'c8', row:3,col:0,len:2,dir:'H',color:'pink'},
+                {id:'c9', row:4,col:3,len:2,dir:'V',color:'green'},
+                {id:'c10',row:5,col:0,len:3,dir:'H',color:'blue'},
+                {id:'c11',row:5,col:4,len:2,dir:'H',color:'orange'},
+            ]
+        },
+        {
+            name:"L'Expert", diff:'EXPERT',
+            hint:'Dégagez la colonne 4 en chaîne. Commencez par les blocs verticaux à droite.',
+            cars:[
+                {id:'red',row:2,col:1,len:2,dir:'H',color:'red'},
+                {id:'d1', row:0,col:0,len:3,dir:'V',color:'indigo'},
+                {id:'d2', row:0,col:2,len:2,dir:'H',color:'lime'},
+                {id:'d3', row:0,col:3,len:3,dir:'V',color:'orange'},
+                {id:'d4', row:0,col:4,len:2,dir:'H',color:'teal'},
+                {id:'d5', row:1,col:5,len:2,dir:'V',color:'purple'},
+                {id:'d6', row:2,col:3,len:2,dir:'H',color:'blue'},
+                {id:'d7', row:3,col:0,len:2,dir:'V',color:'pink'},
+                {id:'d8', row:3,col:2,len:2,dir:'H',color:'yellow'},
+                {id:'d9', row:3,col:4,len:3,dir:'V',color:'green'},
+                {id:'d10',row:4,col:1,len:2,dir:'H',color:'orange'},
+                {id:'d11',row:5,col:3,len:3,dir:'H',color:'indigo'},
+            ]
+        },
+        {
+            name:'Chaos Total', diff:'INSANE',
+            hint:'Libérez la colonne 2 vers le bas, puis travaillez en chaîne vers la sortie.',
+            cars:[
+                {id:'red',row:2,col:0,len:2,dir:'H',color:'red'},
+                {id:'e1', row:0,col:0,len:2,dir:'H',color:'teal'},
+                {id:'e2', row:0,col:2,len:2,dir:'V',color:'blue'},
+                {id:'e3', row:0,col:3,len:2,dir:'H',color:'lime'},
+                {id:'e4', row:0,col:5,len:3,dir:'V',color:'orange'},
+                {id:'e5', row:1,col:1,len:2,dir:'H',color:'purple'},
+                {id:'e6', row:1,col:4,len:2,dir:'V',color:'pink'},
+                {id:'e7', row:2,col:2,len:2,dir:'V',color:'indigo'},
+                {id:'e8', row:2,col:4,len:2,dir:'H',color:'yellow'},
+                {id:'e9', row:3,col:0,len:2,dir:'V',color:'green'},
+                {id:'e10',row:3,col:2,len:3,dir:'H',color:'blue'},
+                {id:'e11',row:4,col:1,len:2,dir:'H',color:'orange'},
+                {id:'e12',row:4,col:4,len:2,dir:'V',color:'teal'},
+                {id:'e13',row:5,col:0,len:3,dir:'H',color:'purple'},
+                {id:'e14',row:5,col:4,len:2,dir:'H',color:'lime'},
+            ]
+        },
+    ];
+
+    /* ════════════════════════════════════════════
+       ÉTAT
+    ════════════════════════════════════════════ */
+    const G = 6; // taille grille
+    let lvlIdx = 0;
+    let cars   = [];  // copies mutables
+    let moves  = 0;
+    let bests  = {};
+    let selId  = null;
+
+    function cloneCars(src){ return src.map(c=>({...c})); }
+    function byId(id){ return cars.find(c=>c.id===id); }
+
+    /* Grille logique 6×6 — null ou id de voiture */
+    function makeGrid(excludeId){
+        const g = Array.from({length:G},()=>Array(G).fill(null));
+        for(const car of cars){
+            if(car.id===excludeId) continue;
+            for(let i=0;i<car.len;i++){
+                const r = car.dir==='V' ? car.row+i : car.row;
+                const c = car.dir==='H' ? car.col+i : car.col;
+                if(r>=0&&r<G&&c>=0&&c<G) g[r][c]=car.id;
+            }
+        }
+        return g;
+    }
+
+    /* Espaces libres devant (+) et derrière (-) une voiture */
+    function freeSpaces(id){
+        const car=byId(id), g=makeGrid(id);
+        let fwd=0,bwd=0;
+        if(car.dir==='H'){
+            for(let c=car.col+car.len;c<G;c++){ if(g[car.row][c]) break; fwd++; }
+            for(let c=car.col-1;c>=0;c--)    { if(g[car.row][c]) break; bwd++; }
+        } else {
+            for(let r=car.row+car.len;r<G;r++){ if(g[r][car.col]) break; fwd++; }
+            for(let r=car.row-1;r>=0;r--)    { if(g[r][car.col]) break; bwd++; }
+        }
+        return {fwd,bwd};
+    }
+
+    /* Déplace une voiture de delta cases (clamped). Retourne le delta réel. */
+    function moveCar(id,delta){
+        if(!delta) return 0;
+        const car=byId(id);
+        const {fwd,bwd}=freeSpaces(id);
+        const real=Math.sign(delta)*Math.min(Math.abs(delta),delta>0?fwd:bwd);
+        if(!real) return 0;
+        if(car.dir==='H') car.col+=real; else car.row+=real;
+        return real;
+    }
+
+    /* ════════════════════════════════════════════
+       RENDU
+       Stratégie :
+       1. Créer 36 cellules .cell dans #board (grid CSS → elles se placent automatiquement)
+       2. Créer les voitures en position:absolute dans #board
+          left  = PAD + col*(CELL+GAP)
+          top   = PAD + row*(CELL+GAP)
+          width = len*CELL + (len-1)*GAP
+          height= CELL  (ou len*CELL+(len-1)*GAP si V)
+       On lit CELL et GAP depuis le DOM (getBoundingClientRect) pour être précis.
+    ════════════════════════════════════════════ */
+    const board = document.getElementById('board');
+    const PAD   = 10; // padding du #board en px (doit correspondre au CSS)
+    const GAP   = 5;  // gap entre cellules
+
+    function getCellSize(){
+        // Lire la taille réelle d'une cellule après rendu CSS
+        const cell = board.querySelector('.cell');
+        if(!cell) return 68;
+        return cell.getBoundingClientRect().width;
+    }
+
+    function px(col,row,len,dir){
+        const cs = getCellSize();
+        const left  = PAD + col*(cs+GAP);
+        const top   = PAD + row*(cs+GAP);
+        const width = dir==='H' ? len*cs+(len-1)*GAP : cs;
+        const height= dir==='V' ? len*cs+(len-1)*GAP : cs;
+        return {left,top,width,height};
+    }
+
+    function renderBoard(){
+        board.innerHTML='';
+
+        // 1. Cellules de fond
+        for(let i=0;i<G*G;i++){
+            const d=document.createElement('div');
+            d.className='cell';
+            board.appendChild(d);
+        }
+
+        // 2. Voitures — on les place APRÈS les cellules pour avoir leur taille
+        // On utilise requestAnimationFrame pour s'assurer que les cellules sont rendues
+        requestAnimationFrame(()=>{
+            // Supprimer les anciennes voitures si présentes
+            board.querySelectorAll('.car').forEach(e=>e.remove());
+
+            for(const car of cars){
+                const el=document.createElement('div');
+                el.className=`car ${car.dir}${car.id==='red'?' target':''}`;
+                el.dataset.id=car.id;
+                el.setAttribute('data-c',car.color);
+
+                setCarStyle(el,car);
+
+                if(car.id==='red'){
+                    const s=document.createElement('span');
+                    s.className='car-lbl'; s.textContent='★';
+                    el.appendChild(s);
+                }
+                board.appendChild(el);
+                bindCarEvents(el);
+            }
+        });
+    }
+
+    function setCarStyle(el,car){
+        const {left,top,width,height}=px(car.col,car.row,car.len,car.dir);
+        el.style.left  =left+'px';
+        el.style.top   =top+'px';
+        el.style.width =width+'px';
+        el.style.height=height+'px';
+    }
+
+    function refreshCar(id){
+        const car=byId(id);
+        const el=board.querySelector(`.car[data-id="${id}"]`);
+        if(car&&el) setCarStyle(el,car);
+    }
+
+    function updateHUD(){
+        document.getElementById('h-lvl').textContent  = String(lvlIdx+1).padStart(2,'0');
+        document.getElementById('h-mv').textContent   = String(moves).padStart(2,'0');
+        const b=bests[lvlIdx];
+        document.getElementById('h-best').textContent = b!=null?String(b).padStart(2,'0'):'--';
+    }
+
+    function renderLvlList(){
+        const list=document.getElementById('lvl-list');
+        list.innerHTML='';
+        LEVELS.forEach((lv,i)=>{
+            const b=document.createElement('button');
+            b.className='lvl-btn'+(i===lvlIdx?' active':'')+(bests[i]!=null?' done':'');
+            b.innerHTML=`<span>${i+1}. ${lv.name}</span><span class="lbadge">${bests[i]!=null?'✓ '+bests[i]:lv.diff}</span>`;
+            b.onclick=()=>loadLevel(i);
+            list.appendChild(b);
+        });
+    }
+
+    /* ════════════════════════════════════════════
+       CHARGEMENT NIVEAU
+    ════════════════════════════════════════════ */
+    function loadLevel(i){
+        lvlIdx=i; cars=cloneCars(LEVELS[i].cars); moves=0; selId=null;
+        document.getElementById('tip-card').style.display='none';
+        document.getElementById('mission').textContent=`Niv.${i+1} — ${LEVELS[i].diff}. Guidez ★ vers →`;
+        updateHUD(); renderLvlList(); renderBoard();
+    }
+
+    /* ════════════════════════════════════════════
+       VICTOIRE
+    ════════════════════════════════════════════ */
+    function checkVictory(){
+        const r=byId('red');
+        if(r&&r.col+r.len-1>=G-1) setTimeout(doWin,200);
+    }
+
+    function doWin(){
+        const prev=bests[lvlIdx];
+        if(prev==null||moves<prev){ bests[lvlIdx]=moves; saveBests(); }
+        const stars=moves<=7?3:moves<=14?2:1;
+        document.getElementById('w-lvl').textContent=lvlIdx+1;
+        document.getElementById('w-mv').textContent=moves;
+        document.getElementById('w-stars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+        const ov=document.getElementById('win');
+        ov.classList.add('show');
+        const hasNext=lvlIdx<LEVELS.length-1;
+        const btn=document.getElementById('btn-next');
+        btn.textContent=hasNext?'NIVEAU SUIVANT →':'REJOUER ↺';
+        btn.onclick=()=>{ ov.classList.remove('show'); loadLevel(hasNext?lvlIdx+1:0); };
+        confetti();
+        renderLvlList();
+    }
+
+    /* ════════════════════════════════════════════
+       DRAG & DROP
+    ════════════════════════════════════════════ */
+    let drag=null;
+
+    function bindCarEvents(el){
+        el.addEventListener('mousedown', e=>{ e.preventDefault(); startDrag(el.dataset.id,e.clientX,e.clientY); });
+        el.addEventListener('touchstart',e=>{ e.preventDefault(); startDrag(el.dataset.id,e.touches[0].clientX,e.touches[0].clientY); },{passive:false});
+    }
+
+    function startDrag(id,x,y){
+        const car=byId(id);
+        drag={ id, x0:x, y0:y, col0:car.col, row0:car.row, applied:0 };
+        selectCar(id);
+        board.querySelector(`.car[data-id="${id}"]`)?.classList.add('dragging');
+    }
+
+    window.addEventListener('mousemove',e=>onMove(e.clientX,e.clientY));
+    window.addEventListener('mouseup',  ()=>endDrag());
+    window.addEventListener('touchmove',e=>{ e.preventDefault(); onMove(e.touches[0].clientX,e.touches[0].clientY); },{passive:false});
+    window.addEventListener('touchend', ()=>endDrag());
+
+    function onMove(x,y){
+        if(!drag) return;
+        const car=byId(drag.id);
+        const cs=getCellSize()+GAP;
+        const raw=(car.dir==='H'?x-drag.x0:y-drag.y0)/cs;
+        const want=Math.round(raw);
+
+        // Replacer à l'origine pour recalculer les espaces libres
+        car.col=drag.col0; car.row=drag.row0;
+        const {fwd,bwd}=freeSpaces(drag.id);
+        const clamped=want>=0?Math.min(want,fwd):-Math.min(-want,bwd);
+
+        if(car.dir==='H') car.col=drag.col0+clamped;
+        else              car.row=drag.row0+clamped;
+        drag.applied=clamped;
+
+        refreshCar(drag.id);
+    }
+
+    function endDrag(){
+        if(!drag) return;
+        const el=board.querySelector(`.car[data-id="${drag.id}"]`);
+        el?.classList.remove('dragging');
+        if(drag.applied!==0){ moves++; updateHUD(); checkVictory(); }
+        else {
+            // Snap retour
+            const car=byId(drag.id); car.col=drag.col0; car.row=drag.row0; refreshCar(drag.id);
+        }
+        drag=null;
+    }
+
+    /* ════════════════════════════════════════════
+       CLAVIER
+    ════════════════════════════════════════════ */
+    function selectCar(id){
+        if(selId){ board.querySelector(`.car[data-id="${selId}"]`)?.style.removeProperty('outline'); }
+        selId=id;
+        if(id){ const el=board.querySelector(`.car[data-id="${id}"]`); if(el) el.style.outline='2px solid rgba(255,255,255,.75)'; }
+    }
+
+    board.addEventListener('click',e=>{ const c=e.target.closest('.car'); if(c) selectCar(c.dataset.id); });
+
+    document.addEventListener('keydown',e=>{
+        if(!selId) return;
+        const car=byId(selId); if(!car) return;
+        let delta=0;
+        if(e.key==='ArrowRight'&&car.dir==='H') delta= 1;
+        if(e.key==='ArrowLeft' &&car.dir==='H') delta=-1;
+        if(e.key==='ArrowDown' &&car.dir==='V') delta= 1;
+        if(e.key==='ArrowUp'   &&car.dir==='V') delta=-1;
+        if(e.key==='Tab'){ e.preventDefault(); const ids=cars.map(c=>c.id); selectCar(ids[(ids.indexOf(selId)+1)%ids.length]); return; }
+        if(e.key==='Escape'){ selectCar(null); return; }
+        if(!delta) return;
+        e.preventDefault();
+        const real=moveCar(selId,delta);
+        if(real){ moves++; updateHUD(); refreshCar(selId); const el=board.querySelector(`.car[data-id="${selId}"]`); el?.classList.add('moving'); setTimeout(()=>el?.classList.remove('moving'),300); checkVictory(); }
+        else { const el=board.querySelector(`.car[data-id="${selId}"]`); el?.classList.add('shake'); setTimeout(()=>el?.classList.remove('shake'),350); }
+    });
+
+    /* ════════════════════════════════════════════
+       BOUTONS
+    ════════════════════════════════════════════ */
+    document.getElementById('btn-reset').onclick=()=>loadLevel(lvlIdx);
+    document.getElementById('btn-skip').onclick =()=>loadLevel((lvlIdx+1)%LEVELS.length);
+    document.getElementById('btn-hint').onclick =()=>{
+        document.getElementById('tip-text').textContent=LEVELS[lvlIdx].hint;
+        document.getElementById('tip-card').style.display='block';
+    };
+
+    /* ════════════════════════════════════════════
+       PERSISTANCE
+    ════════════════════════════════════════════ */
+    function loadBests(){ try{ const r=localStorage.getItem('rh4'); if(r) bests=JSON.parse(r); }catch(_){} }
+    function saveBests(){ try{ localStorage.setItem('rh4',JSON.stringify(bests)); }catch(_){} }
+
+    /* ════════════════════════════════════════════
+       CONFETTIS
+    ════════════════════════════════════════════ */
+    function confetti(){
+        const cv=document.getElementById('confetti');
+        const cx=cv.getContext('2d');
+        cv.width=innerWidth; cv.height=innerHeight;
+        const COLS=['#ff2550','#0aadff','#00ffe1','#ffd60a','#1dff8a','#bf5fff','#ff9f0a','#ff4ec4'];
+        const ps=Array.from({length:140},()=>({
+            x:Math.random()*cv.width, y:-20-Math.random()*cv.height*.4,
+            w:6+Math.random()*10, h:10+Math.random()*14,
+            r:Math.random()*Math.PI*2, rv:(Math.random()-.5)*.15,
+            vx:(Math.random()-.5)*5, vy:3+Math.random()*5,
+            col:COLS[0|Math.random()*COLS.length], a:1
+        }));
+        let raf;
+        (function draw(){
+            cx.clearRect(0,0,cv.width,cv.height);
+            let alive=0;
+            for(const p of ps){
+                p.x+=p.vx; p.y+=p.vy; p.r+=p.rv; p.vy+=.1;
+                if(p.y>cv.height*.75) p.a-=.018;
+                if(p.a<=0) continue; alive++;
+                cx.save(); cx.globalAlpha=p.a; cx.translate(p.x,p.y); cx.rotate(p.r);
+                cx.fillStyle=p.col; cx.shadowColor=p.col; cx.shadowBlur=10;
+                cx.fillRect(-p.w/2,-p.h/2,p.w,p.h); cx.restore();
+            }
+            if(alive>0) raf=requestAnimationFrame(draw);
+            else cx.clearRect(0,0,cv.width,cv.height);
+        })();
+    }
+
+    /* ════════════════════════════════════════════
+       PARTICULES FOND
+    ════════════════════════════════════════════ */
+    (function spawnParticles(){
+        const con=document.getElementById('bg-particles');
+        if(!con) return;
+        const COLS=['#0aadff','#00ffe1','#ff2550','#bf5fff','#ffd60a'];
+        for(let i=0;i<28;i++){
+            const p=document.createElement('div'); p.className='pt';
+            const sz=2+Math.random()*5;
+            p.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;`
+                +`background:${COLS[0|Math.random()*COLS.length]};`
+                +`--d:${7+Math.random()*12}s;--dl:${Math.random()*10}s;`;
+            con.appendChild(p);
+        }
+    })();
+
+    /* ════════════════════════════════════════════
+       RESIZE — recalculer la position des voitures
+    ════════════════════════════════════════════ */
+    let resizeTimer;
+    window.addEventListener('resize',()=>{
+        clearTimeout(resizeTimer);
+        resizeTimer=setTimeout(()=>{ board.querySelectorAll('.car').forEach(el=>{ const car=byId(el.dataset.id); if(car) setCarStyle(el,car); }); },150);
+    });
+
+    /* ════════════════════════════════════════════
+       DÉMARRAGE
+    ════════════════════════════════════════════ */
+    loadBests();
+    loadLevel(0);
+</script>
+
+<!-- div pour les particules (créées en JS) -->
+<div id="bg-particles" style="position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden"></div>
+</body>
+</html>
